@@ -2,7 +2,7 @@
 
 A [Probe](https://github.com/mozership/probe) action that starts a container for the steps after it, such as the database or the mail server an API under test needs, and removes it once the run is over.
 
-Probe downloads it the first time a workflow uses it. It needs a Probe that calls an action once a run is over, which is the release after v1.26.0, and the `docker` command, or [another runtime](#runtimes) that takes the same arguments.
+Probe downloads it the first time a workflow uses it. It needs Probe v1.27.0 or later, which calls an action once a run is over, and the `docker` command, or [another runtime](#runtimes) that takes the same arguments.
 
 ```yaml
 name: Orders

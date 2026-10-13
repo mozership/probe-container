@@ -6,12 +6,6 @@ on:
   pull_request:
   workflow_dispatch:
 
-env:
-  # The Probe the e2e workflows run: the first commit that calls an action
-  # once a run is over. Install a release with mozership/probe-action in its
-  # place once one has it.
-  PROBE_REF: 434443f7518bdc48801dd2ac92e3bc42b35c4094
-
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -44,8 +38,13 @@ jobs:
       # Probe resolves the action before the first job of a workflow, so it
       # is built first.
       - run: go build -o e2e/action/probe-container .
+      # The probe the e2e workflows run. The action checks it against the
+      # digest of its release and adds it to PATH.
       - name: Install Probe
-        run: go install "github.com/mozership/probe/cmd/probe@${PROBE_REF}"
+        uses: mozership/probe-action@831b8b6c6aa0c8a61aa75b58f36a08da5c579e83 # v1.3.0
+        with:
+          install-only: true
+          version: v1.27.0
       - run: probe check e2e/workflow.yml
       - name: Containers are started, reached, and removed once the run is over
         run: |
