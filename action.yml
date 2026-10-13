@@ -1,0 +1,7 @@
+name: container
+description: Start a container, and remove it once the run is over
+params: [image, name, command, env, ports, volumes, network, pull, wait, keep]
+cleanup: true
+runs:
+  using: binary
+  url: https://github.com/mozership/probe-container/releases/download/v0.0.0/probe-container_{os}_{arch}

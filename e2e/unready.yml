@@ -1,0 +1,20 @@
+# A container that stops before it is ready fails its step, which ends the
+# run with exit status 3, and is removed all the same:
+#
+#   probe e2e/unready.yml
+name: probe-container with a container that is not ready
+
+actions:
+  container: ./action
+
+jobs:
+- name: A container that is not ready
+  steps:
+  - name: One that stops before its log matches
+    uses: container
+    with:
+      image: docker.io/library/alpine:3.22
+      command: [sh, -c, 'echo giving up; exit 7']
+      wait:
+        log: never written
+    test: status == 0

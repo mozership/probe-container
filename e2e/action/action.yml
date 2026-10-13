@@ -1,0 +1,12 @@
+# probe-container built from this checkout, for the workflows of e2e. Probe
+# resolves an action before the first job starts, so the executable is built
+# before probe runs:
+#
+#   go build -o e2e/action/probe-container . && probe e2e/workflow.yml
+name: container
+description: Start a container, and remove it once the run is over
+params: [image, name, command, env, ports, volumes, network, pull, wait, keep]
+cleanup: true
+runs:
+  using: binary
+  path: probe-container

@@ -1,0 +1,88 @@
+name: Test
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+env:
+  # The Probe the e2e workflows run: the first commit that calls an action
+  # once a run is over. Install a release with mozership/probe-action in its
+  # place once one has it.
+  PROBE_REF: 434443f7518bdc48801dd2ac92e3bc42b35c4094
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
+        with:
+          go-version-file: go.mod
+      - run: go vet ./...
+      - run: go test -race ./...
+
+  # The tests above answer from a stand-in. This one runs the action through
+  # Probe with Docker and with Podman, and looks at what is left once each
+  # run is over.
+  e2e:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        runtime:
+          - docker
+          - podman
+    env:
+      PROBE_CONTAINER_RUNTIME: ${{ matrix.runtime }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
+        with:
+          go-version-file: go.mod
+      # Probe resolves the action before the first job of a workflow, so it
+      # is built first.
+      - run: go build -o e2e/action/probe-container .
+      - name: Install Probe
+        run: go install "github.com/mozership/probe/cmd/probe@${PROBE_REF}"
+      - run: probe check e2e/workflow.yml
+      - name: Containers are started, reached, and removed once the run is over
+        run: |
+          probe e2e/workflow.yml
+          test -z "$("$PROBE_CONTAINER_RUNTIME" ps --all --quiet --filter label=probe.run_id)"
+      # Podman runs a health check from a timer of systemd, which a runner
+      # does not give it.
+      - name: A container is waited for by its health check
+        if: matrix.runtime == 'docker'
+        run: |
+          probe e2e/healthcheck.yml
+          test -z "$("$PROBE_CONTAINER_RUNTIME" ps --all --quiet --filter label=probe.run_id)"
+      - name: A container that is not ready fails its step, and is removed
+        run: |
+          status=0
+          probe e2e/unready.yml > "$RUNNER_TEMP/unready.txt" 2>&1 || status=$?
+          cat "$RUNNER_TEMP/unready.txt"
+          test "$status" -eq 3
+          grep -F 'the container stopped with exit status 7 before it was ready; its log ends with: giving up' "$RUNNER_TEMP/unready.txt"
+          test -z "$("$PROBE_CONTAINER_RUNTIME" ps --all --quiet --filter label=probe.run_id)"
+      - name: A container a step keeps is left, and told of
+        run: |
+          probe e2e/keep.yml > "$RUNNER_TEMP/keep.txt" 2>&1
+          cat "$RUNNER_TEMP/keep.txt"
+          grep -F 'kept containers of the run' "$RUNNER_TEMP/keep.txt"
+          grep -F 'count=1' "$RUNNER_TEMP/keep.txt"
+          left="$("$PROBE_CONTAINER_RUNTIME" ps --all --quiet --filter label=probe.run_id)"
+          test "$(echo "$left" | wc -w)" -eq 1
+          test "$left" = "$("$PROBE_CONTAINER_RUNTIME" ps --all --quiet --filter label=probe.keep=true)"
+          "$PROBE_CONTAINER_RUNTIME" rm --force --volumes $left
+      - name: Every container is left under PROBE_CONTAINER_KEEP
+        env:
+          PROBE_CONTAINER_KEEP: "1"
+        run: |
+          probe e2e/keep.yml > "$RUNNER_TEMP/keep-all.txt" 2>&1
+          cat "$RUNNER_TEMP/keep-all.txt"
+          grep -F 'count=2' "$RUNNER_TEMP/keep-all.txt"
+          left="$("$PROBE_CONTAINER_RUNTIME" ps --all --quiet --filter label=probe.run_id)"
+          test "$(echo "$left" | wc -w)" -eq 2
+          "$PROBE_CONTAINER_RUNTIME" rm --force --volumes $left

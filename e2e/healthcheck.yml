@@ -1,0 +1,28 @@
+# A container waited for by the health check of its image:
+#
+#   probe e2e/healthcheck.yml
+name: probe-container with a health check
+
+actions:
+  container: ./action
+
+jobs:
+- name: An image with a health check
+  steps:
+  - name: The step is over once the check passes
+    uses: container
+    with:
+      image: docker.io/axllent/mailpit:v1.27
+      ports: [8025, "1025/tcp"]
+      wait:
+        healthcheck: true
+    test: status == 0 && res.ports["8025"] > 0 && res.ports["1025"] > 0 && res.port == res.ports["8025"]
+    outputs:
+      addr: res.addr
+
+  - name: And the server answers
+    uses: http
+    with:
+      url: "http://{{outputs.addr}}"
+      get: /readyz
+    test: res.code == 200

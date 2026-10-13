@@ -1,0 +1,76 @@
+# The end-to-end tests: probe-container run through Probe with a real
+# runtime. Run it from the repository root, with the action built first, as
+# Probe resolves it before the first job:
+#
+#   go build -o e2e/action/probe-container . && probe e2e/workflow.yml
+#
+# PROBE_CONTAINER_RUNTIME names another runtime than docker. The containers
+# are removed once the run is over.
+name: probe-container with a runtime
+
+# The action as it was just built, by the name a workflow would give a
+# released one.
+actions:
+  container: ./action
+
+jobs:
+- name: A server in a container
+  id: server
+  steps:
+  - name: Start a web server on a free port, and wait for it to answer
+    id: web
+    uses: container
+    with:
+      image: docker.io/library/nginx:1.29-alpine
+      ports: [80]
+      wait:
+        port: 80
+        timeout: 60s
+    test: |
+      status == 0 && res.id != "" && res.name != "" &&
+      res.host == "127.0.0.1" && res.port > 0 && res.ports["80"] == res.port
+    outputs:
+      addr: res.addr
+      port: res.port
+
+  - name: The server answers on the port the step returned
+    uses: http
+    with:
+      url: "http://{{outputs.web.addr}}"
+      get: /
+    test: res.code == 200
+
+  - name: Start a second one beside it, on a port of its own
+    id: other
+    uses: container
+    with:
+      image: docker.io/library/nginx:1.29-alpine
+      ports: [80]
+      wait:
+        port: 80
+    test: status == 0 && res.port != outputs.web.port
+    outputs:
+      other_addr: res.addr
+
+  - name: The second one answers too
+    uses: http
+    with:
+      url: "http://{{outputs.other.other_addr}}"
+      get: /
+    test: res.code == 200
+
+- name: What a container is given
+  id: given
+  steps:
+  - name: The environment and the command reach the container, and its log is waited for
+    id: env
+    uses: container
+    with:
+      image: docker.io/library/alpine:3.22
+      env:
+        GREETING: hello from probe
+        COUNT: 3
+      command: [sh, -c, 'echo "$GREETING x$COUNT"; sleep 300']
+      wait:
+        log: 'hello from probe x3'
+    test: status == 0 && res.ports == {} && req.env == ["COUNT", "GREETING"]

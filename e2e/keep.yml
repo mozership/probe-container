@@ -1,0 +1,29 @@
+# What probe-container leaves once a run is over: the container of the step
+# that sets keep, and every one under PROBE_CONTAINER_KEEP=1.
+#
+#   probe e2e/keep.yml
+#   PROBE_CONTAINER_KEEP=1 probe e2e/keep.yml
+#
+# Remove what is left with the command the run ends with.
+name: probe-container keeping containers
+
+actions:
+  container: ./action
+
+jobs:
+- name: Two containers
+  steps:
+  - name: One that is kept
+    uses: container
+    with:
+      image: docker.io/library/alpine:3.22
+      command: [sleep, 300]
+      keep: true
+    test: status == 0 && req.keep
+
+  - name: One that is removed, unless the environment keeps every one
+    uses: container
+    with:
+      image: docker.io/library/alpine:3.22
+      command: [sleep, 300]
+    test: status == 0
