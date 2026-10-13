@@ -74,3 +74,23 @@ jobs:
       wait:
         log: 'hello from probe x3'
     test: status == 0 && res.ports == {} && req.env == ["COUNT", "GREETING"]
+
+  - name: The options of the runtime reach the container
+    id: options
+    uses: container
+    with:
+      image: docker.io/library/alpine:3.22
+      entrypoint: /bin/sh
+      command: [-c, 'echo "at $(pwd) as $(id -u) on $(hostname), api.test is $(getent hosts api.test | cut -d" " -f1)"; sleep 300']
+      user: 1000
+      workdir: /tmp
+      hostname: probed
+      add_hosts: ["api.test:192.0.2.10"]
+      labels:
+        suite: e2e
+      init: true
+      wait:
+        log: 'at /tmp as 1000 on probed, api\.test is 192\.0\.2\.10'
+    test: |
+      status == 0 && req.add_hosts == ["api.test:192.0.2.10"] && req.user == "1000" &&
+      req.labels.suite == "e2e" && req.init

@@ -1,6 +1,36 @@
 name: container
 description: Start a container, and remove it once the run is over
-params: [image, name, command, env, ports, volumes, network, pull, wait, keep]
+params:
+  - image
+  - name
+  - command
+  - env
+  - ports
+  - volumes
+  - network
+  - pull
+  - wait
+  - keep
+  - labels
+  - platform
+  - entrypoint
+  - user
+  - workdir
+  - hostname
+  - network_aliases
+  - add_hosts
+  - dns
+  - env_files
+  - tmpfs
+  - cap_add
+  - cap_drop
+  - ulimits
+  - memory
+  - cpus
+  - shm_size
+  - privileged
+  - read_only
+  - init
 cleanup: true
 runs:
   using: binary
