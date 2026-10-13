@@ -1,42 +1,12 @@
 name: container
 description: Start a container, and remove it once the run is over
-params:
-  - image
-  - name
-  - command
-  - env
-  - ports
-  - volumes
-  - network
-  - pull
-  - wait
-  - keep
-  - labels
-  - platform
-  - entrypoint
-  - user
-  - workdir
-  - hostname
-  - network_aliases
-  - add_hosts
-  - dns
-  - env_files
-  - tmpfs
-  - cap_add
-  - cap_drop
-  - ulimits
-  - memory
-  - cpus
-  - shm_size
-  - privileged
-  - read_only
-  - init
+params: [image, name, command, env, ports, volumes, network, pull, wait, keep, labels, platform, entrypoint, user, workdir, hostname, network_aliases, add_hosts, dns, env_files, tmpfs, cap_add, cap_drop, ulimits, memory, cpus, shm_size, privileged, read_only, init]
 cleanup: true
 runs:
   using: binary
-  url: https://github.com/mozership/probe-container/releases/download/v0.1.0/probe-container_{os}_{arch}
+  url: https://github.com/mozership/probe-container/releases/download/v0.2.0/probe-container_{os}_{arch}
   checksums:
-    darwin_amd64: "57491797a1098442434284ad11a262f81e9533dbeee0c5a5fbb4bc119e005a94"
-    darwin_arm64: "76a6fa900316a6f7e9980df2ef49a906d7446c592808e9a886e016a3e8dafd7a"
-    linux_amd64: "9325094693b475fead3a05dcaba6ad251bbb7bb5a5e4ccde7911893f949f28b5"
-    linux_arm64: "bd72c28e4b661736f6c278b8a4450de97904216a5789c5f86bd023f4330f0203"
+    darwin_amd64: "ce6c0aadc43a33f822337090043cf755dc53b4833a3c4651077e58ed0079a6ba"
+    darwin_arm64: "d08f2ee7dda33c96a4f1f8529ab1e71871d4c0ace2c5d0c06cd390ae86d5d5aa"
+    linux_amd64: "3403cd48be27163638b40e7262fd6790f35fbbb88d4d1578c30f295e71514c28"
+    linux_arm64: "b465401efd996723f7ab6609dfdb1d0820388409e1bd5de71ceb662052103f1e"
