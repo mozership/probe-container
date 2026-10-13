@@ -54,7 +54,10 @@ const (
 
 // params are the keys the action takes in with. action.yml declares them,
 // for probe check to report a key the action does not take.
-var params = []string{"image", "name", "command", "env", "ports", "volumes", "network", "pull", "wait", "keep"}
+var params = slices.Concat(
+	[]string{"image", "name", "command", "env", "ports", "volumes", "network", "pull", "wait", "keep", "labels"},
+	optionKeys(),
+)
 
 // pulls are the values of with.pull, as the --pull of a runtime takes them.
 var pulls = []string{"missing", "always", "never"}

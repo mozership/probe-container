@@ -21,6 +21,64 @@ var waitParams = []string{"port", "log", "healthcheck", "timeout"}
 // protocols are the protocols a port can be published for.
 var protocols = []string{"tcp", "udp", "sctp"}
 
+// kind is how the value of an option is written in a step.
+type kind int
+
+const (
+	// word is one value, a string or a number.
+	word kind = iota
+	// wordList is a list of them, each given to the runtime with the flag.
+	wordList
+	// toggle is true or false, and the flag is given when it is true.
+	toggle
+)
+
+// option is a parameter that is given to the runtime as one of its own
+// options, with the value the step wrote.
+type option struct {
+	key  string
+	flag string
+	kind kind
+}
+
+// options are given to the runtime in this order.
+var options = []option{
+	{"platform", "--platform", word},
+	{"entrypoint", "--entrypoint", word},
+	{"user", "--user", word},
+	{"workdir", "--workdir", word},
+	{"hostname", "--hostname", word},
+	{"network_aliases", "--network-alias", wordList},
+	{"add_hosts", "--add-host", wordList},
+	{"dns", "--dns", wordList},
+	{"env_files", "--env-file", wordList},
+	{"tmpfs", "--tmpfs", wordList},
+	{"cap_add", "--cap-add", wordList},
+	{"cap_drop", "--cap-drop", wordList},
+	{"ulimits", "--ulimit", wordList},
+	{"memory", "--memory", word},
+	{"cpus", "--cpus", word},
+	{"shm_size", "--shm-size", word},
+	{"privileged", "--privileged", toggle},
+	{"read_only", "--read-only", toggle},
+	{"init", "--init", toggle},
+}
+
+// optionKeys returns the keys of options, in their order.
+func optionKeys() []string {
+	keys := make([]string, len(options))
+	for i, o := range options {
+		keys[i] = o.key
+	}
+	return keys
+}
+
+// chosen is an option a step sets. A toggle that is set has no values.
+type chosen struct {
+	option
+	values []string
+}
+
 type request struct {
 	image   string
 	name    string
@@ -30,8 +88,13 @@ type request struct {
 	env     []string
 	ports   []port
 	volumes []string
+	// labels are the labels the step gives the container, as name=value in
+	// the order of the names.
+	labels  []string
 	network string
 	pull    string
+	// options are the options of the runtime the step sets.
+	options []chosen
 	wait    *wait
 	keep    bool
 	// runID is the run the container is labelled with.
@@ -95,7 +158,18 @@ func parseRequest(with map[string]any) (*request, error) {
 	if r.volumes, err = words(with, "volumes"); err != nil {
 		return nil, err
 	}
-	if r.env, err = parseEnv(with["env"]); err != nil {
+	if r.env, err = pairs(with, "env"); err != nil {
+		return nil, err
+	}
+	if r.labels, err = pairs(with, "labels"); err != nil {
+		return nil, err
+	}
+	for _, l := range r.labels {
+		if name, _, _ := strings.Cut(l, "="); name == labelRun || name == labelKeep {
+			return nil, fmt.Errorf("with.labels has the label %s, which the action sets itself", name)
+		}
+	}
+	if r.options, err = parseOptions(with); err != nil {
 		return nil, err
 	}
 	if r.ports, err = parsePorts(with["ports"]); err != nil {
@@ -165,27 +239,72 @@ func plain(v any) (string, bool) {
 	}
 }
 
-func parseEnv(v any) ([]string, error) {
+// pairs returns with[key], a map of names to plain values, as name=value in
+// the order of the names.
+func pairs(with map[string]any, key string) ([]string, error) {
+	v := with[key]
 	if v == nil {
 		return nil, nil
 	}
 	m, ok := v.(map[string]any)
 	if !ok {
-		return nil, fmt.Errorf("with.env must be a map of names to values, not %v", v)
+		return nil, fmt.Errorf("with.%s must be a map of names to values, not %v", key, v)
 	}
-	env := make([]string, 0, len(m))
+	if len(m) == 0 {
+		return nil, nil
+	}
+	out := make([]string, 0, len(m))
 	for k, e := range m {
 		if k == "" || strings.Contains(k, "=") {
-			return nil, fmt.Errorf("with.env has the name %q, which a variable cannot have", k)
+			return nil, fmt.Errorf("with.%s has the name %q, and a name is not empty and has no equals sign", key, k)
 		}
 		s, ok := plain(e)
 		if !ok {
-			return nil, fmt.Errorf("with.env.%s must be a string, a number or a boolean", k)
+			return nil, fmt.Errorf("with.%s.%s must be a string, a number or a boolean", key, k)
 		}
-		env = append(env, k+"="+s)
+		out = append(out, k+"="+s)
 	}
-	slices.Sort(env)
-	return env, nil
+	slices.Sort(out)
+	return out, nil
+}
+
+// parseOptions returns the options with sets, in the order of options. One
+// that is empty or false is the same as one that is left out.
+func parseOptions(with map[string]any) ([]chosen, error) {
+	var set []chosen
+	for _, o := range options {
+		v, ok := with[o.key]
+		if !ok || v == nil {
+			continue
+		}
+		switch o.kind {
+		case word:
+			s, ok := plain(v)
+			if _, isBool := v.(bool); !ok || isBool {
+				return nil, fmt.Errorf("with.%s must be a string or a number, not %v", o.key, v)
+			}
+			if s != "" {
+				set = append(set, chosen{o, []string{s}})
+			}
+		case wordList:
+			list, err := words(with, o.key)
+			if err != nil {
+				return nil, err
+			}
+			if len(list) > 0 {
+				set = append(set, chosen{o, list})
+			}
+		case toggle:
+			on, ok := v.(bool)
+			if !ok {
+				return nil, fmt.Errorf("with.%s must be true or false, not %v", o.key, v)
+			}
+			if on {
+				set = append(set, chosen{option: o})
+			}
+		}
+	}
+	return set, nil
 }
 
 func parsePorts(v any) ([]port, error) {
@@ -371,6 +490,17 @@ func (r *request) args() []string {
 	for _, v := range r.volumes {
 		args = append(args, "--volume", v)
 	}
+	for _, l := range r.labels {
+		args = append(args, "--label", l)
+	}
+	for _, o := range r.options {
+		if o.kind == toggle {
+			args = append(args, o.flag)
+		}
+		for _, v := range o.values {
+			args = append(args, o.flag, v)
+		}
+	}
 	args = append(args, r.image)
 	return append(args, r.command...)
 }
@@ -407,6 +537,24 @@ func (r *request) info() map[string]any {
 			ports[i] = p.key
 		}
 		info["ports"] = ports
+	}
+	if len(r.labels) > 0 {
+		labels := make(map[string]any, len(r.labels))
+		for _, l := range r.labels {
+			name, value, _ := strings.Cut(l, "=")
+			labels[name] = value
+		}
+		info["labels"] = labels
+	}
+	for _, o := range r.options {
+		switch o.kind {
+		case word:
+			info[o.key] = o.values[0]
+		case wordList:
+			info[o.key] = list(o.values)
+		case toggle:
+			info[o.key] = true
+		}
 	}
 	return info
 }

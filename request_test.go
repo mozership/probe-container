@@ -80,6 +80,144 @@ func TestParseRequestDefaults(t *testing.T) {
 	}
 }
 
+func TestParseRequestOptions(t *testing.T) {
+	r, err := parseRequest(map[string]any{
+		"image":           "alpine",
+		"labels":          map[string]any{"b": "two words", "a": 1, "c": "x=y"},
+		"platform":        "linux/amd64",
+		"entrypoint":      "/bin/sh",
+		"user":            1000,
+		"workdir":         "/app",
+		"hostname":        "db",
+		"network_aliases": []any{"db", "database"},
+		"add_hosts":       []any{"host.docker.internal:host-gateway", "api.test:192.0.2.1"},
+		"dns":             []any{"192.0.2.53"},
+		"env_files":       []any{"/abs/test.env"},
+		"tmpfs":           []any{"/run", "/tmp:size=64m"},
+		"cap_add":         []any{"NET_ADMIN"},
+		"cap_drop":        []any{"ALL"},
+		"ulimits":         []any{"nofile=65536:65536"},
+		"memory":          "512m",
+		"cpus":            1.5,
+		"shm_size":        int64(268435456),
+		"privileged":      true,
+		"read_only":       true,
+		"init":            true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(r.options) != len(options) {
+		t.Errorf("%d options are set, want every one of the %d", len(r.options), len(options))
+	}
+
+	want := []string{
+		"run", "--detach", "--label", "probe.run_id=run1",
+		"--label", "a=1", "--label", "b=two words", "--label", "c=x=y",
+		"--platform", "linux/amd64",
+		"--entrypoint", "/bin/sh",
+		"--user", "1000",
+		"--workdir", "/app",
+		"--hostname", "db",
+		"--network-alias", "db", "--network-alias", "database",
+		"--add-host", "host.docker.internal:host-gateway", "--add-host", "api.test:192.0.2.1",
+		"--dns", "192.0.2.53",
+		"--env-file", "/abs/test.env",
+		"--tmpfs", "/run", "--tmpfs", "/tmp:size=64m",
+		"--cap-add", "NET_ADMIN",
+		"--cap-drop", "ALL",
+		"--ulimit", "nofile=65536:65536",
+		"--memory", "512m",
+		"--cpus", "1.5",
+		"--shm-size", "268435456",
+		"--privileged", "--read-only", "--init",
+		"alpine",
+	}
+	r.runID = "run1"
+	if got := r.args(); !reflect.DeepEqual(got, want) {
+		t.Errorf("args =\n %q\nwant\n %q", got, want)
+	}
+
+	wantInfo := map[string]any{
+		"image":           "alpine",
+		"keep":            false,
+		"labels":          map[string]any{"a": "1", "b": "two words", "c": "x=y"},
+		"platform":        "linux/amd64",
+		"entrypoint":      "/bin/sh",
+		"user":            "1000",
+		"workdir":         "/app",
+		"hostname":        "db",
+		"network_aliases": []any{"db", "database"},
+		"add_hosts":       []any{"host.docker.internal:host-gateway", "api.test:192.0.2.1"},
+		"dns":             []any{"192.0.2.53"},
+		"env_files":       []any{"/abs/test.env"},
+		"tmpfs":           []any{"/run", "/tmp:size=64m"},
+		"cap_add":         []any{"NET_ADMIN"},
+		"cap_drop":        []any{"ALL"},
+		"ulimits":         []any{"nofile=65536:65536"},
+		"memory":          "512m",
+		"cpus":            "1.5",
+		"shm_size":        "268435456",
+		"privileged":      true,
+		"read_only":       true,
+		"init":            true,
+	}
+	if got := r.info(); !reflect.DeepEqual(got, wantInfo) {
+		t.Errorf("info = %v, want %v", got, wantInfo)
+	}
+}
+
+// An option that is empty or false is not given to the runtime, as one that
+// is left out is not.
+func TestParseRequestOptionsThatAreNotSet(t *testing.T) {
+	with := map[string]any{"image": "alpine", "labels": map[string]any{}}
+	for _, o := range options {
+		switch o.kind {
+		case word:
+			with[o.key] = ""
+		case wordList:
+			with[o.key] = []any{}
+		case toggle:
+			with[o.key] = false
+		}
+	}
+	r, err := parseRequest(with)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := (&request{image: "alpine"}); !reflect.DeepEqual(r, want) {
+		t.Errorf("request = %+v, want %+v", r, want)
+	}
+
+	for _, o := range options {
+		with[o.key] = nil
+	}
+	with["labels"] = nil
+	if r, err = parseRequest(with); err != nil {
+		t.Fatal(err)
+	}
+	if want := (&request{image: "alpine"}); !reflect.DeepEqual(r, want) {
+		t.Errorf("request with nothing for its options = %+v, want %+v", r, want)
+	}
+}
+
+// Every option has a key and a flag of its own.
+func TestOptions(t *testing.T) {
+	keys, flags := map[string]bool{}, map[string]bool{}
+	for _, o := range options {
+		if keys[o.key] || flags[o.flag] {
+			t.Errorf("the option %s, or its flag %s, is listed twice", o.key, o.flag)
+		}
+		keys[o.key], flags[o.flag] = true, true
+		if !strings.HasPrefix(o.flag, "--") {
+			t.Errorf("the option %s has the flag %s", o.key, o.flag)
+		}
+	}
+	if len(keys) != len(optionKeys()) {
+		t.Errorf("optionKeys = %v", optionKeys())
+	}
+}
+
 func TestParseRequestWaitTimeout(t *testing.T) {
 	tests := []struct {
 		in   any
@@ -112,7 +250,7 @@ func TestParseRequestErrors(t *testing.T) {
 		{"an empty image", map[string]any{"image": ""}, "container action requires with.image"},
 		{"an image that is not a string", map[string]any{"image": 3}, "with.image must be a string"},
 		{"an image that is an option", map[string]any{"image": "--privileged"}, "would be read as an option"},
-		{"a key it does not take", map[string]any{"image": "a", "runtime": "podman"}, "container action takes image, name, command, env, ports, volumes, network, pull, wait, keep, not runtime"},
+		{"a key it does not take", map[string]any{"image": "a", "runtime": "podman"}, "container action takes " + strings.Join(params, ", ") + ", not runtime"},
 		{"a name that is not a string", map[string]any{"image": "a", "name": []any{"x"}}, "with.name must be a string"},
 		{"a network that is not a string", map[string]any{"image": "a", "network": true}, "with.network must be a string"},
 		{"a pull that is not a string", map[string]any{"image": "a", "pull": true}, "with.pull must be a string"},
@@ -126,6 +264,18 @@ func TestParseRequestErrors(t *testing.T) {
 		{"an env with no name", map[string]any{"image": "a", "env": map[string]any{"": "c"}}, `with.env has the name ""`},
 		{"an env with a list for a value", map[string]any{"image": "a", "env": map[string]any{"A": []any{1}}}, "with.env.A must be a string, a number or a boolean"},
 		{"an env with nothing for a value", map[string]any{"image": "a", "env": map[string]any{"A": nil}}, "with.env.A must be a string, a number or a boolean"},
+		{"labels that are a list", map[string]any{"image": "a", "labels": []any{"a=b"}}, "with.labels must be a map of names to values"},
+		{"a label with a name that has an equals sign", map[string]any{"image": "a", "labels": map[string]any{"a=b": "c"}}, `with.labels has the name "a=b"`},
+		{"a label with a list for a value", map[string]any{"image": "a", "labels": map[string]any{"a": []any{1}}}, "with.labels.a must be a string, a number or a boolean"},
+		{"the label of the run", map[string]any{"image": "a", "labels": map[string]any{"probe.run_id": "other"}}, "with.labels has the label probe.run_id, which the action sets itself"},
+		{"the label of a kept container", map[string]any{"image": "a", "labels": map[string]any{"probe.keep": "true"}}, "with.labels has the label probe.keep, which the action sets itself"},
+		{"an entrypoint that is a list", map[string]any{"image": "a", "entrypoint": []any{"sh", "-c"}}, "with.entrypoint must be a string or a number"},
+		{"a user that is a boolean", map[string]any{"image": "a", "user": true}, "with.user must be a string or a number"},
+		{"hosts that are a string", map[string]any{"image": "a", "add_hosts": "api.test:192.0.2.1"}, "with.add_hosts must be a list"},
+		{"hosts that are a map", map[string]any{"image": "a", "add_hosts": map[string]any{"api.test": "192.0.2.1"}}, "with.add_hosts must be a list"},
+		{"a host that is a list", map[string]any{"image": "a", "add_hosts": []any{[]any{"api.test"}}}, "with.add_hosts[0] must be a string or a number"},
+		{"a privileged that is a string", map[string]any{"image": "a", "privileged": "yes"}, "with.privileged must be true or false"},
+		{"an init that is a number", map[string]any{"image": "a", "init": 1}, "with.init must be true or false"},
 		{"ports that are a number", map[string]any{"image": "a", "ports": 80}, "with.ports must be a list"},
 		{"a port that is a boolean", map[string]any{"image": "a", "ports": []any{true}}, "with.ports[0] must be a port of the container"},
 		{"a port with a fraction", map[string]any{"image": "a", "ports": []any{80.5}}, "with.ports[0] must be a port of the container"},

@@ -107,14 +107,17 @@ func TestRunStepStartsAContainerOfTheRun(t *testing.T) {
 	a := newAction(rt, nil)
 
 	ret, state, err := a.RunStep(step(map[string]any{
-		"image":   "nginx:1",
-		"name":    "web",
-		"command": []any{"nginx", "-g", "daemon off;"},
-		"env":     map[string]any{"B": "two words", "A": int64(1), "C": true},
-		"ports":   []any{float64(80), "53/udp"},
-		"volumes": []any{"/src:/dst:ro"},
-		"network": "testnet",
-		"pull":    "always",
+		"image":     "nginx:1",
+		"name":      "web",
+		"command":   []any{"nginx", "-g", "daemon off;"},
+		"env":       map[string]any{"B": "two words", "A": int64(1), "C": true},
+		"ports":     []any{float64(80), "53/udp"},
+		"volumes":   []any{"/src:/dst:ro"},
+		"network":   "testnet",
+		"pull":      "always",
+		"labels":    map[string]any{"suite": "orders"},
+		"add_hosts": []any{"host.docker.internal:host-gateway"},
+		"init":      true,
 	}))
 	if err != nil {
 		t.Fatal(err)
@@ -129,6 +132,9 @@ func TestRunStepStartsAContainerOfTheRun(t *testing.T) {
 		"--env", "A=1", "--env", "B=two words", "--env", "C=true",
 		"--publish", "127.0.0.1::80", "--publish", "127.0.0.1::53/udp",
 		"--volume", "/src:/dst:ro",
+		"--label", "suite=orders",
+		"--add-host", "host.docker.internal:host-gateway",
+		"--init",
 		"nginx:1", "nginx", "-g", "daemon off;",
 	}
 	if got := rt.calls[0]; !slices.Equal(got, wantArgs) {
@@ -150,15 +156,18 @@ func TestRunStepStartsAContainerOfTheRun(t *testing.T) {
 		t.Errorf("res = %v, want %v", got, wantRes)
 	}
 	wantReq := map[string]any{
-		"image":   "nginx:1",
-		"name":    "web",
-		"network": "testnet",
-		"pull":    "always",
-		"keep":    false,
-		"command": []any{"nginx", "-g", "daemon off;"},
-		"volumes": []any{"/src:/dst:ro"},
-		"env":     []any{"A", "B", "C"},
-		"ports":   []any{"80", "53/udp"},
+		"image":     "nginx:1",
+		"name":      "web",
+		"network":   "testnet",
+		"pull":      "always",
+		"keep":      false,
+		"command":   []any{"nginx", "-g", "daemon off;"},
+		"volumes":   []any{"/src:/dst:ro"},
+		"env":       []any{"A", "B", "C"},
+		"ports":     []any{"80", "53/udp"},
+		"labels":    map[string]any{"suite": "orders"},
+		"add_hosts": []any{"host.docker.internal:host-gateway"},
+		"init":      true,
 	}
 	if got := ret["req"]; !reflect.DeepEqual(got, wantReq) {
 		t.Errorf("req = %v, want %v", got, wantReq)
