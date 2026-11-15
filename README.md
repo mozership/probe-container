@@ -2,12 +2,14 @@
 
 A [Probe](https://github.com/mozership/probe) action that starts a container for the steps after it, such as the database or the mail server an API under test needs, and removes it once the run is over.
 
-Probe downloads it the first time a workflow uses it. It needs Probe v1.27.0 or later, which calls an action once a run is over, and the `docker` command, or [another runtime](#runtimes) that takes the same arguments.
+It is an [external action](https://probe.linyo.ws/guide/concepts/actions#external-actions): Probe downloads it the first time a workflow uses it, and runs the executable whose SHA-256 the `action.yml` at the pinned commit names. It needs Probe v1.27.0 or later, which [calls an action once a run is over](https://probe.linyo.ws/guide/concepts/actions#cleaning-up-after-a-run), and the `docker` command, or [another runtime](#runtimes) that takes the same arguments.
 
 ```yaml
 name: Orders
 actions:
   container: github.com/mozership/probe-container@<commit SHA>
+vars:
+  pg_password: "{{PG_PASSWORD}}"
 jobs:
 - name: orders
   steps:
@@ -32,7 +34,7 @@ jobs:
     test: res.rows[0].n == 0
 ```
 
-The workflow gives the action a name once, under `actions`, and its steps use the name. Probe only takes a full 40-character commit SHA there. The notes of each [release](https://github.com/mozership/probe-container/releases) start with the action and its commit to copy.
+The workflow gives the action a name once, under [`actions`](https://probe.linyo.ws/reference/yaml-configuration#actions), and its steps use the name. Probe only takes a full 40-character commit SHA there. The notes of each [release](https://github.com/mozership/probe-container/releases) start with the action and its commit to copy.
 
 A step is over once its container is started, and ready if the step has a `wait`. The container keeps running for the steps after it, in this job and in the others, and is removed, with its anonymous volumes, when the run is over: whether it passed, failed, or was ended by Ctrl+C. Nothing has to be written for that, and there is nothing to stop by hand.
 
@@ -105,7 +107,22 @@ When more than one is given, every one of them has to hold. The time it takes to
 
 The step fails when the container stops while it is waited for, or is not ready in time, and the error ends with the last lines of its log. The container is removed with the others once the run is over.
 
-A server that takes connections before it can answer, as a database may, is better waited for by its log or its health check, or by a step after it that Probe retries.
+A server that takes connections before it can answer, as a database may, is better waited for by its log or its health check, or by a step after it that Probe [retries](https://probe.linyo.ws/reference/yaml-configuration#retry).
+
+```yaml
+steps:
+  - name: Start Postgres, and wait until it is up for good
+    uses: container
+    with:
+      image: postgres:17
+      env:
+        POSTGRES_PASSWORD: "{{vars.pg_password}}"
+      ports: [5432]
+      wait:
+        # The image starts the server once to set it up, and then again.
+        log: "(?s)ready to accept connections.*ready to accept connections"
+        timeout: 90s
+```
 
 ### Reaching the Machine
 
@@ -121,7 +138,7 @@ Docker Desktop gives a container that name without being asked. Docker on Linux 
 
 ### Passwords
 
-The action leaves the values of `env` out of its result and its log, which name the variables alone. Probe hides a value that is one of the workflow's `secrets` wherever it shows a step.
+The action leaves the values of `env` out of its result and its log, which name the variables alone. Probe hides a value that is one of the workflow's [`secrets`](https://probe.linyo.ws/reference/yaml-configuration#secrets) wherever it shows a step.
 
 The values are given to the runtime as arguments, so they can be seen in the list of processes of the machine while the container is being started, and in what the runtime tells of the container afterwards. A variable of `env_files` is read by the runtime from its file, and is in no argument.
 
@@ -173,7 +190,7 @@ The action uses `run`, `inspect`, `port`, `logs`, `ps` and `rm` of the runtime. 
 
 ## Under a Guard
 
-The action keeps to no guard: what runs in a container, and the hosts it connects to, are not the action's to limit. A run under `--read-only` or `--allow-host` refuses its steps, unless `--allow-action` names the action.
+The action keeps to no guard: what runs in a container, and the hosts it connects to, are not the action's to limit. A run under `--read-only` or `--allow-host` refuses its steps, unless `--allow-action` names the action. See [Guard](https://probe.linyo.ws/guide/concepts/guard).
 
 ## What Is Left Behind
 
