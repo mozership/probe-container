@@ -4,9 +4,9 @@ params: [image, name, command, env, ports, volumes, network, pull, wait, keep, l
 cleanup: true
 runs:
   using: binary
-  url: https://github.com/mozership/probe-container/releases/download/v0.2.1/probe-container_{os}_{arch}
+  url: https://github.com/mozership/probe-container/releases/download/v0.2.2/probe-container_{os}_{arch}
   checksums:
-    darwin_amd64: "3dbd316478728a23f379ee38d73b36d8f2823b2e42dc0bd77258a8d0349812ce"
-    darwin_arm64: "039e5fe2ffc0a834081e5294a9a3d82af6dec300199d0385e5848fbcd91bfb35"
-    linux_amd64: "da5b020203c24fa9d086ba2633efbf17f102aa4330823c8c39b2fbebcf78b740"
-    linux_arm64: "508214b47fe554c5318fa85247db97e5eee8d0ff0332bcf8ad7a3f85699daf8c"
+    darwin_amd64: "f15dbbb72593443167bf69a0f28c2f77b2a04f1b8f2cbc9d45734867927e3354"
+    darwin_arm64: "f0acdddfd83f75eb67b3896512598f9d7f2b76ff1e30bf75ea7c83488e71c13c"
+    linux_amd64: "b588aa973592294c691ed78e57013d5516664033815d7efe9fd18aee4e012304"
+    linux_arm64: "5ef98832b7b24ced3c023b03ab9480cec16d5d2dc1b6d62bfd6401e1ca39f07a"
