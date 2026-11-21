@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"maps"
 	"net"
 	"os"
 	"reflect"
@@ -216,9 +217,7 @@ func TestRunStepKeepsAContainer(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			rt := &runtime{answers: started()}
 			with := map[string]any{"image": "alpine"}
-			for k, v := range tt.with {
-				with[k] = v
-			}
+			maps.Copy(with, tt.with)
 			call := step(with)
 			call.Cleanups = tt.cleanups
 			ret, _, err := newAction(rt, tt.env).RunStep(call)
@@ -319,9 +318,7 @@ func TestRunStepFailures(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			rt := &runtime{answers: tt.answers}
 			with := map[string]any{"image": "alpine"}
-			for k, v := range tt.with {
-				with[k] = v
-			}
+			maps.Copy(with, tt.with)
 			_, _, err := newAction(rt, nil).RunStep(step(with))
 			if err == nil || !strings.Contains(err.Error(), tt.want) {
 				t.Errorf("err = %v, want one with %q", err, tt.want)

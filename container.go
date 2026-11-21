@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"net"
 	"os"
 	"os/exec"
@@ -122,9 +123,7 @@ func forLog(with map[string]any) map[string]any {
 		return with
 	}
 	logged := make(map[string]any, len(with))
-	for k, v := range with {
-		logged[k] = v
-	}
+	maps.Copy(logged, with)
 	logged["env"] = names(env)
 	return logged
 }
@@ -355,7 +354,7 @@ func lastLine(s string) string {
 // tail returns the last n lines of s that are not blank, joined by "; ".
 func tail(s string, n int) string {
 	var lines []string
-	for _, l := range strings.Split(s, "\n") {
+	for l := range strings.SplitSeq(s, "\n") {
 		if l = strings.TrimSpace(l); l != "" {
 			lines = append(lines, l)
 		}

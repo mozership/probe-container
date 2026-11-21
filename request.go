@@ -584,7 +584,7 @@ func (b binding) addr() string {
 // the loopback one.
 func parseBindings(out string) map[string]binding {
 	bound := map[string]binding{}
-	for _, line := range strings.Split(out, "\n") {
+	for line := range strings.SplitSeq(out, "\n") {
 		inside, outside, ok := strings.Cut(strings.TrimSpace(line), " -> ")
 		if !ok {
 			continue
