@@ -36,6 +36,8 @@ params:
   - privileged
   - read_only
   - init
+choices:
+  pull: [missing, always, never]
 cleanup: true
 runs:
   using: binary

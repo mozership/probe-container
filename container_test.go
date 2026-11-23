@@ -699,6 +699,11 @@ func TestManifests(t *testing.T) {
 		if !slices.Equal(m.Params, params) {
 			t.Errorf("%s declares params %v, want %v", name, m.Params, params)
 		}
+		// pull takes only the policies the action passes to --pull, so that
+		// probe check reports another.
+		if want := map[string]actionref.Choice{"pull": {Values: pulls}}; !reflect.DeepEqual(m.Choices, want) {
+			t.Errorf("%s declares choices %v, want %v", name, m.Choices, want)
+		}
 		if !m.Cleanup {
 			t.Errorf("%s does not set cleanup", name)
 		}
