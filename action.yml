@@ -6,9 +6,9 @@ choices:
 cleanup: true
 runs:
   using: binary
-  url: https://github.com/mozership/probe-container/releases/download/v0.2.2/probe-container_{os}_{arch}
+  url: https://github.com/mozership/probe-container/releases/download/v0.2.3/probe-container_{os}_{arch}
   checksums:
-    darwin_amd64: "f15dbbb72593443167bf69a0f28c2f77b2a04f1b8f2cbc9d45734867927e3354"
-    darwin_arm64: "f0acdddfd83f75eb67b3896512598f9d7f2b76ff1e30bf75ea7c83488e71c13c"
-    linux_amd64: "b588aa973592294c691ed78e57013d5516664033815d7efe9fd18aee4e012304"
-    linux_arm64: "5ef98832b7b24ced3c023b03ab9480cec16d5d2dc1b6d62bfd6401e1ca39f07a"
+    darwin_amd64: "665eb2706df1b4db6f25f25c46d2b67d587270ae57e93d9f32e443dd6b1cf403"
+    darwin_arm64: "ca96cd7c5348da62c123177c24e18258c1471ae383c24416ff3d90c7538fd466"
+    linux_amd64: "85eda8b7a3279cb2225b3f9757736c9021995a25deb7d7807b71c1b58ec11b7c"
+    linux_arm64: "c85b44d9e9fff27a4a935ecccb271c8a06fbf2ca5ffb6cafd3b7b0344d79af17"
