@@ -8,6 +8,7 @@ It is an [external action](https://probe.linyo.ws/guide/concepts/actions#externa
 name: Orders
 actions:
   container: github.com/mozership/probe-container@<commit SHA>
+  db: github.com/mozership/probe-db@<commit SHA>
 vars:
   pg_password: "{{PG_PASSWORD}}"
 jobs:
@@ -34,7 +35,7 @@ jobs:
     test: res.rows[0].n == 0
 ```
 
-The workflow gives the action a name once, under [`actions`](https://probe.linyo.ws/reference/yaml-configuration#actions), and its steps use the name. Probe only takes a full 40-character commit SHA there. The notes of each [release](https://github.com/mozership/probe-container/releases) start with the action and its commit to copy.
+The workflow gives the action a name once, under [`actions`](https://probe.linyo.ws/reference/yaml-configuration#actions), and its steps use the name. The database is read with [probe-db](https://github.com/mozership/probe-db), which is named there too, as Probe has no built-in `db` action from v1.42.0. Probe only takes a full 40-character commit SHA there. The notes of each [release](https://github.com/mozership/probe-container/releases) start with the action and its commit to copy.
 
 A step is over once its container is started, and ready if the step has a `wait`. The container keeps running for the steps after it, in this job and in the others, and is removed, with its anonymous volumes, when the run is over: whether it passed, failed, or was ended by Ctrl+C. Nothing has to be written for that, and there is nothing to stop by hand.
 
