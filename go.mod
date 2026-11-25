@@ -4,7 +4,7 @@ go 1.27.4
 
 require (
 	github.com/hashicorp/go-hclog v1.6.3
-	github.com/mozership/probe v1.39.0
+	github.com/mozership/probe v1.40.0
 )
 
 require (

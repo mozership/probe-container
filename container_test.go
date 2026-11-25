@@ -15,8 +15,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-hclog"
-	"github.com/mozership/probe/actionref"
-	"github.com/mozership/probe/actionrpc"
+	"github.com/mozership/probe/sdk"
 )
 
 // answer is what a stand-in for the runtime answers one command with.
@@ -83,11 +82,11 @@ func newAction(rt *runtime, env map[string]string) *Action {
 
 // step is a call as Probe makes it for a step of the run "run1", under a
 // Probe that cleans up.
-func step(with map[string]any) actionrpc.Call {
-	return actionrpc.Call{
+func step(with map[string]any) sdk.Call {
+	return sdk.Call{
 		With:     with,
-		Step:     actionrpc.Step{RunID: "run1"},
-		Cleanups: &actionrpc.Cleanups{},
+		Step:     sdk.Step{RunID: "run1"},
+		Cleanups: &sdk.Cleanups{},
 	}
 }
 
@@ -176,7 +175,7 @@ func TestRunStepStartsAContainerOfTheRun(t *testing.T) {
 	if ret["status"] != 0 {
 		t.Errorf("status = %v, want 0", ret["status"])
 	}
-	if _, err := actionrpc.Sendable(ret); err != nil {
+	if _, err := sdk.Sendable(ret); err != nil {
 		t.Errorf("the result cannot be sent to Probe: %v", err)
 	}
 }
@@ -201,16 +200,16 @@ func TestRunStepKeepsAContainer(t *testing.T) {
 		name     string
 		with     map[string]any
 		env      map[string]string
-		cleanups *actionrpc.Cleanups
+		cleanups *sdk.Cleanups
 		want     bool
 	}{
-		{name: "by default it is removed", cleanups: &actionrpc.Cleanups{}},
-		{name: "with.keep", with: map[string]any{"keep": true}, cleanups: &actionrpc.Cleanups{}, want: true},
-		{name: "with.keep false", with: map[string]any{"keep": false}, cleanups: &actionrpc.Cleanups{}},
-		{name: "the environment", env: map[string]string{envKeep: "1"}, cleanups: &actionrpc.Cleanups{}, want: true},
-		{name: "the environment over with.keep false", with: map[string]any{"keep": false}, env: map[string]string{envKeep: "true"}, cleanups: &actionrpc.Cleanups{}, want: true},
-		{name: "the environment set to false", env: map[string]string{envKeep: "0"}, cleanups: &actionrpc.Cleanups{}},
-		{name: "the environment set to what is neither", env: map[string]string{envKeep: "yes please"}, cleanups: &actionrpc.Cleanups{}, want: true},
+		{name: "by default it is removed", cleanups: &sdk.Cleanups{}},
+		{name: "with.keep", with: map[string]any{"keep": true}, cleanups: &sdk.Cleanups{}, want: true},
+		{name: "with.keep false", with: map[string]any{"keep": false}, cleanups: &sdk.Cleanups{}},
+		{name: "the environment", env: map[string]string{envKeep: "1"}, cleanups: &sdk.Cleanups{}, want: true},
+		{name: "the environment over with.keep false", with: map[string]any{"keep": false}, env: map[string]string{envKeep: "true"}, cleanups: &sdk.Cleanups{}, want: true},
+		{name: "the environment set to false", env: map[string]string{envKeep: "0"}, cleanups: &sdk.Cleanups{}},
+		{name: "the environment set to what is neither", env: map[string]string{envKeep: "yes please"}, cleanups: &sdk.Cleanups{}, want: true},
 		{name: "with.keep under a Probe that does not clean up", with: map[string]any{"keep": true}, want: true},
 	}
 	for _, tt := range tests {
@@ -589,7 +588,7 @@ func TestCleanup(t *testing.T) {
 			a := newAction(rt, tt.env)
 			a.log = hclog.New(&hclog.LoggerOptions{Output: &logged, Level: hclog.Warn})
 
-			err := a.Cleanup(actionrpc.CleanupCall{RunID: "run1"})
+			err := a.Cleanup(sdk.CleanupCall{RunID: "run1"})
 			if tt.wantErr == "" && err != nil {
 				t.Fatal(err)
 			}
@@ -613,12 +612,12 @@ func TestCleanup(t *testing.T) {
 
 func TestCleanupFailures(t *testing.T) {
 	a := newAction(&runtime{}, nil)
-	if err := a.Cleanup(actionrpc.CleanupCall{}); err == nil || !strings.Contains(err.Error(), "ID of the run") {
+	if err := a.Cleanup(sdk.CleanupCall{}); err == nil || !strings.Contains(err.Error(), "ID of the run") {
 		t.Errorf("without a run: err = %v", err)
 	}
 
 	rt := &runtime{answers: map[string][]answer{"ps": {{err: errors.New("cannot connect to the daemon")}}}}
-	err := newAction(rt, nil).Cleanup(actionrpc.CleanupCall{RunID: "run1"})
+	err := newAction(rt, nil).Cleanup(sdk.CleanupCall{RunID: "run1"})
 	if err == nil || !strings.Contains(err.Error(), "listing the containers of the run: cannot connect to the daemon") {
 		t.Errorf("without a daemon: err = %v", err)
 	}
@@ -635,7 +634,7 @@ func TestCleanupTellsOfAKeptContainerItCannotDescribe(t *testing.T) {
 	var logged bytes.Buffer
 	a := newAction(rt, map[string]string{envKeep: "1"})
 	a.log = hclog.New(&hclog.LoggerOptions{Output: &logged, Level: hclog.Warn})
-	if err := a.Cleanup(actionrpc.CleanupCall{RunID: "run1"}); err != nil {
+	if err := a.Cleanup(sdk.CleanupCall{RunID: "run1"}); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(logged.String(), "kept container: id=abc") {
@@ -692,7 +691,7 @@ func TestManifests(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		m, err := actionref.ParseManifest(data)
+		m, err := sdk.ParseManifest(data)
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
@@ -701,7 +700,7 @@ func TestManifests(t *testing.T) {
 		}
 		// pull takes only the policies the action passes to --pull, so that
 		// probe check reports another.
-		if want := map[string]actionref.Choice{"pull": {Values: pulls}}; !reflect.DeepEqual(m.Choices, want) {
+		if want := map[string]sdk.Choice{"pull": {Values: pulls}}; !reflect.DeepEqual(m.Choices, want) {
 			t.Errorf("%s declares choices %v, want %v", name, m.Choices, want)
 		}
 		if !m.Cleanup {
@@ -713,4 +712,4 @@ func TestManifests(t *testing.T) {
 	}
 }
 
-var _ actionrpc.Cleaner = (*Action)(nil)
+var _ sdk.Cleaner = (*Action)(nil)

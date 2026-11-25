@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-hclog"
-	"github.com/mozership/probe/actionrpc"
+	"github.com/mozership/probe/sdk"
 )
 
 const (
@@ -83,7 +83,7 @@ type Action struct {
 // Run fails: a container outlives its step, and without a step there is no
 // run to remove it after.
 func (a *Action) Run(with map[string]any) (map[string]any, error) {
-	ret, _, err := a.RunStep(actionrpc.Call{With: with})
+	ret, _, err := a.RunStep(sdk.Call{With: with})
 	return ret, err
 }
 
@@ -91,11 +91,11 @@ func (a *Action) Run(with map[string]any) (map[string]any, error) {
 // and returns once it is ready, with the ports it is reached at. A
 // container that does not become ready is an error, and is left to the
 // cleanup like any other.
-func (a *Action) RunStep(call actionrpc.Call) (map[string]any, map[string]any, error) {
+func (a *Action) RunStep(call sdk.Call) (map[string]any, map[string]any, error) {
 	if a.log == nil {
 		a.log = hclog.NewNullLogger()
 	}
-	actionrpc.LogParams(a.log, "received request parameters", forLog(call.With))
+	sdk.LogParams(a.log, "received request parameters", forLog(call.With))
 
 	req, err := parseRequest(call.With)
 	if err != nil {
@@ -111,7 +111,7 @@ func (a *Action) RunStep(call actionrpc.Call) (map[string]any, map[string]any, e
 	}
 
 	ret, err := a.start(context.Background(), req)
-	actionrpc.LogOutcome(a.log, "container", ret, err)
+	sdk.LogOutcome(a.log, "container", ret, err)
 	return ret, nil, err
 }
 
@@ -204,7 +204,7 @@ func (a *Action) start(ctx context.Context, r *request) (map[string]any, error) 
 // Cleanup removes the containers the steps of the run started, but for
 // those that are kept, which it names in the log with how to remove them.
 // It does not fail for a run that left none.
-func (a *Action) Cleanup(call actionrpc.CleanupCall) error {
+func (a *Action) Cleanup(call sdk.CleanupCall) error {
 	if a.log == nil {
 		a.log = hclog.NewNullLogger()
 	}
